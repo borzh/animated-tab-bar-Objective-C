@@ -6,8 +6,10 @@
 //  Copyright © 2015年 poloby. All rights reserved.
 //
 
+
 #import "PJXAnimatedTabBarItem.h"
 #import "PJXBadge.h"
+
 
 @interface PJXAnimatedTabBarItem ()
 
@@ -15,7 +17,37 @@
 
 @end
 
+
 @implementation PJXAnimatedTabBarItem
+
+- (void)awakeFromNib
+{
+    [super awakeFromNib];
+    _savedImage = self.image;
+    _savedTitle = self.title;
+}
+
+- (void)setImage:(UIImage *)image
+{
+    [super setImage:image];
+    if (image) {
+        // Put image to iconView and save it for future reference.
+        if (self.iconView)
+            self.iconView.icon.image = image;
+        _savedImage = image;
+    }
+}
+
+- (void)setTitle:(NSString *)title
+{
+    [super setTitle:title];
+    if (title.length) {
+        // Put title to iconView and save it for future reference.
+        if (self.iconView)
+            self.iconView.textLabel.text = title;
+        _savedTitle = title;
+    }
+}
 
 - (NSString *)badgeValue
 {

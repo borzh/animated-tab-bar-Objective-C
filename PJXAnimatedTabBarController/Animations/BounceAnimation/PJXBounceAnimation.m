@@ -22,8 +22,8 @@
     
     UIImage *iconImage = icon.image;
     if (iconImage) {
-        UIImage *renderImage = [iconImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        icon.image = renderImage;
+//        UIImage *renderImage = [iconImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+//        icon.image = renderImage;
         icon.tintColor = defaultTextColor;
     }
 }
@@ -34,8 +34,8 @@
     
     UIImage *iconImage = icon.image;
     if (iconImage) {
-        UIImage *renderImage = [iconImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        icon.image = renderImage;
+//        UIImage *renderImage = [iconImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+//        icon.image = renderImage;
         icon.tintColor = self.iconSelectedColor;
     }
 }

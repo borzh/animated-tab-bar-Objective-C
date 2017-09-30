@@ -10,20 +10,59 @@
 #import "PJXAnimatedTabBarItem.h"
 #import "PJXIconView.h"
 
+@interface PJXAnimatedTabBarController () {
+    NSDictionary *_containers;
+}
+
+@end
+
+
 @implementation PJXAnimatedTabBarController
 
 #pragma mark - life cycle
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+    [self checkMoreNavigationControllerItem];
     
-    NSDictionary *containers = [self createViewContainers];
-    
-    [self createCustomIcons:containers];
+    if (self.animated)
+        [self refresh];
+}
+
+- (void)checkMoreNavigationControllerItem
+{
+    // Create PJXAnimatedTabBarItem for moreNavigationController.
+    UINavigationController *moreController = self.moreNavigationController;
+    if (![moreController.tabBarItem isKindOfClass:[PJXAnimatedTabBarItem class]]) {
+        UIImage *image = self.moreImage;
+        NSString *title = NSLocalizedString(self.moreTitle, nil);
+        
+        PJXAnimatedTabBarItem* moreItem = [[PJXAnimatedTabBarItem alloc] initWithTitle:title image:image tag:moreController.tabBarItem.tag];
+        moreItem.textColor = self.moreTextColor;
+        moreItem.animation = self.moreAnimation;
+        moreController.tabBarItem = moreItem;
+    }
 }
 
 #pragma mark - private methods
 
+- (void)refresh
+{
+    _containers = [self createViewContainers];
+    [self createCustomIcons:_containers];
+}
+
+- (void)setSelectedIndex:(NSUInteger)selectedIndex
+{
+    [super setSelectedIndex:selectedIndex];
+
+    NSArray *items = self.tabBar.items;
+    BOOL isMore = (selectedIndex >= items.count - 1) && (self.moreNavigationController.viewControllers.count > 0);
+    
+    PJXAnimatedTabBarItem *item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
+    [item.animation selectedState:item.iconView.icon textLabel:item.iconView.textLabel];
+}
 
 - (void)createCustomIcons:(NSDictionary *)containers
 {
@@ -32,42 +71,52 @@
     int itemsCount = (int)self.tabBar.items.count - 1;
     int index = 0;
     if (items) {
-        for (PJXAnimatedTabBarItem *item in self.tabBar.items) {
+        for (UITabBarItem *it in self.tabBar.items) {
+            PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)it;
             
-            NSAssert(item.image != nil, @"add image icon in UITabBarItem");
+//            NSAssert(item.image != nil, @"add image icon in UITabBarItem");
             
             NSString *indexString = [NSString stringWithFormat:@"container%d", itemsCount-index];
             UIView *container = containers[indexString];
             container.tag = index;
+  
+            BOOL isSelected = index == self.selectedIndex;
             
-            UIImageView *icon = [[UIImageView alloc] initWithImage:item.image];
-            icon.translatesAutoresizingMaskIntoConstraints = NO;
-            icon.tintColor = [UIColor clearColor];
+            UIImageView *icon;
+            UILabel *textLabel;
             
-            // text
-            UILabel *textLabel = [[UILabel alloc] init];
-            textLabel.text = item.title;
-            textLabel.backgroundColor = [UIColor clearColor];
-            textLabel.textColor = item.textColor;
-            textLabel.font = [UIFont systemFontOfSize:10.0];
-            textLabel.textAlignment = NSTextAlignmentCenter;
-            textLabel.translatesAutoresizingMaskIntoConstraints = NO;
+            if (item.iconView) {
+                icon = item.iconView.icon;
+                textLabel = item.iconView.textLabel;
+            }
+            else {
+                icon = [[UIImageView alloc] initWithImage:item.savedImage];
+                icon.translatesAutoresizingMaskIntoConstraints = NO;
             
+                // text
+                textLabel = [[UILabel alloc] init];
+                textLabel.text = item.savedTitle;
+                textLabel.backgroundColor = [UIColor clearColor];
+                textLabel.font = [UIFont systemFontOfSize:10.0];
+                textLabel.textAlignment = NSTextAlignmentCenter;
+                textLabel.translatesAutoresizingMaskIntoConstraints = NO;
+
+                item.iconView = [[PJXIconView alloc] initWithIcon:icon textLabel:textLabel];
+            }
+            
+            icon.tintColor = isSelected ? item.animation.iconSelectedColor : item.textColor;
+            textLabel.textColor = isSelected ? item.animation.textSelectedColor : item.textColor;
+
             [container addSubview:icon];
-            [self createConstraints:icon container:container size:item.image.size yOffset:-5];
+            [self createConstraints:icon container:container size:item.savedImage.size yOffset:-5];
             
             [container addSubview:textLabel];
             CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count - 5.0;
             [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 10) yOffset:16];
             
-            item.iconView = [[PJXIconView alloc] initWithIcon:icon textLabel:textLabel];
-            
-            if (0 == index) {
-                [item selectedState];
-            }
-            
             item.image = nil;
-            item.title = @"";
+            item.title = nil;
+            
             index++;
         }
     }
@@ -181,32 +230,38 @@
     NSArray<PJXAnimatedTabBarItem *> *items = (NSArray<PJXAnimatedTabBarItem *> *)self.tabBar.items;
     
     NSInteger currentIndex = gesture.view.tag;
+    NSInteger selectedIndex = self.selectedIndex;
+    if (selectedIndex >= items.count) // NSNotFound is index of MoreNavigationController.
+        selectedIndex = items.count - 1; // Last bar item is always of MoreNavigationController.
+
+    BOOL isMore = (currentIndex >= items.count - 1) && (self.moreNavigationController.viewControllers.count > 0);
     
-    if(self.tabBarController != nil && self.tabBarController.delegate != nil && [self.tabBarController.delegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)] && ![self.tabBarController.delegate tabBarController:self.tabBarController shouldSelectViewController:self]) {
-        return ;
+    UIViewController *next = isMore ? self.moreNavigationController : self.viewControllers[currentIndex];
+    
+    PJXAnimatedTabBarItem *deselectItem = (PJXAnimatedTabBarItem *)items[selectedIndex];
+    [deselectItem deselectAnimation];
+    
+    PJXAnimatedTabBarItem *animationItem = (PJXAnimatedTabBarItem *)items[currentIndex];
+    [animationItem playAnimation];
+    [animationItem selectedState];
+    
+    if (selectedIndex != currentIndex) {
+        if (self.delegate &&
+            [self.delegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)] &&
+            ![self.delegate tabBarController:self shouldSelectViewController:next])
+            return;
+        
+        if (isMore)
+            self.selectedViewController = self.moreNavigationController;
+        else
+            self.selectedIndex = gesture.view.tag;
+        
+        if (self.delegate && [self.delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
+            [self.delegate tabBarController:self didSelectViewController:next];
     }
     
-    if (self.selectedIndex != currentIndex) {
-        PJXAnimatedTabBarItem *animationItem = (PJXAnimatedTabBarItem *)items[currentIndex];
-        [animationItem playAnimation];
-        
-        PJXAnimatedTabBarItem *deselectItem = (PJXAnimatedTabBarItem *)items[self.selectedIndex];
-        [deselectItem deselectAnimation];
-        
-        self.selectedIndex = gesture.view.tag;
-        
-        if (self.tabBarController != nil && self.tabBarController.delegate != nil && [self.tabBarController.delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)]) {
-            [self.tabBarController.delegate tabBarController:self.tabBarController didSelectViewController:self];
-        }
-    } else if (self.selectedIndex == currentIndex) {
-        if (self.viewControllers[self.selectedIndex]) {
-            if (self.viewControllers.count == 1) {
-                UINavigationController *navVC = (UINavigationController *)self.viewControllers[self.selectedIndex];
-                if (navVC) {
-                    [navVC popToRootViewControllerAnimated:YES];
-                }
-            }
-        }
+    if (isMore && (selectedIndex == currentIndex)) {
+        [self.moreNavigationController popToRootViewControllerAnimated:YES];
     }
 }
 
