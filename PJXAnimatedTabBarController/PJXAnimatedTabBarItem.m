@@ -11,7 +11,7 @@
 #import "PJXBadge.h"
 
 
-@interface PJXAnimatedTabBarItem ()
+@interface PJXAnimatedTabBarItem () <NSCopying>
 
 @property (nonatomic, strong) PJXBadge *badge;
 
@@ -101,6 +101,12 @@
     if (self.animation != nil && self.iconView != nil) {
         [self.animation selectedState:self.iconView.icon textLabel:self.iconView.textLabel];
     }
+}
+
+- (instancetype)copyWithZone:(nullable NSZone *)zone
+{
+    PJXAnimatedTabBarItem *item = [[PJXAnimatedTabBarItem alloc] initWithTitle:self.savedTitle image:self.savedImage tag:self.tag];
+    return item;
 }
 
 @end
