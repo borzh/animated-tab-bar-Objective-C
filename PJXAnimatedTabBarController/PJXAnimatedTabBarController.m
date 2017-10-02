@@ -7,6 +7,7 @@
 //
 
 
+#import "NSString+Extension.h"
 #import "PJXAnimatedTabBarController.h"
 #import "PJXAnimatedTabBarItem.h"
 #import "PJXIconView.h"
@@ -22,11 +23,14 @@
 
 @implementation PJXAnimatedTabBarController
 
-#pragma mark - life cycle
+#pragma mark - Life cycle.
 
+// We will create custom views in viewWillAppear instead of viewDidLoad, because in viewWillLoad
+// tabBar.items returns all viewController's items, but later it will be only fitting items.
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
+    
     if (!_firstTime) {
         _firstTime = YES;
 
@@ -37,6 +41,21 @@
         [self refresh];
     }
 }
+
+#pragma mark - Public methods.
+
+- (void)refresh
+{
+    if (!self.animated)
+        return;
+    
+    if (_containers)
+        [self removeContainers];
+    
+    _containers = [self createViewContainers];
+    [self createCustomIcons];
+}
+
 
 - (void)setDelegate:(id<UITabBarControllerDelegate>)delegate
 {
@@ -90,9 +109,6 @@
 
 - (void)checkMoreNavigationControllerItem
 {
-    if (!self.animated)
-        return;
-    
     // Create PJXAnimatedTabBarItem for moreNavigationController.
     UITabBarItem *moreItem = self.moreNavigationController.tabBarItem;
     
@@ -114,13 +130,26 @@
     return item;
 }
 
-- (void)refresh
+- (void)setTextForItem:(PJXAnimatedTabBarItem *)item
 {
-    if (!self.animated)
-        return;
+    item.title = nil;
 
-    _containers = [self createViewContainers];
-    [self createCustomIcons];
+    CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)(self.tabBar.items.count);
+    textLabelWidth -= 6.0; // Some padding.
+    
+    UIFont *font = [UIFont systemFontOfSize:10.0];
+    CGFloat kern = [item.savedTitle kernForFont:font toFitWidth:textLabelWidth];
+    
+    NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+    paragraphStyle.alignment = NSTextAlignmentCenter;
+    
+    NSDictionary *attrs = @{
+                            NSFontAttributeName: font,
+                            NSKernAttributeName: @(kern),
+                            NSForegroundColorAttributeName: item.textColor,
+                            NSParagraphStyleAttributeName: paragraphStyle
+                            };
+    item.iconView.textLabel.attributedText = [[NSAttributedString alloc] initWithString:item.savedTitle attributes:attrs];
 }
 
 - (void)setItemImage:(UIImage *)image forItem:(PJXAnimatedTabBarItem *)item
@@ -138,7 +167,7 @@
 
 - (void)restoreImageForItem:(PJXAnimatedTabBarItem *)item
 {
-    NSAssert([item isKindOfClass:[PJXAnimatedTabBarItem class]], @"item should be PJXAnimatedTabBarItem", nil);
+    NSAssert([item isKindOfClass:[PJXAnimatedTabBarItem class]], @"item should be PJXAnimatedTabBarItem");
               
     if (item.image == nil) {
         [self setItemImage:item.savedImage forItem:item];
@@ -166,7 +195,10 @@
     for (NSString *key in _containers)
         [_containers[key] removeFromSuperview];
     _containers = nil;
-    
+}
+
+- (void)restoreImages
+{
     // Restore images for tab bar items.
     for (UIViewController *vc in self.viewControllers)
         [self restoreImageForItem:(PJXAnimatedTabBarItem *)vc.tabBarItem];
@@ -201,6 +233,8 @@
 
 - (void)createContainerForItem:(PJXAnimatedTabBarItem *)item index:(int)index count:(int)count
 {
+    NSAssert([item isKindOfClass:[PJXAnimatedTabBarItem class]], @"item should be PJXAnimatedTabBarItem");
+    
     UIImageView *icon;
     UILabel *textLabel;
     
@@ -212,10 +246,10 @@
         icon = [[UIImageView alloc] initWithImage:item.savedImage];
         icon.translatesAutoresizingMaskIntoConstraints = NO;
         
-        // text
         textLabel = [[UILabel alloc] init];
-        textLabel.text = item.savedTitle;
         textLabel.backgroundColor = [UIColor clearColor];
+        textLabel.lineBreakMode = NSLineBreakByClipping;
+        textLabel.text = item.savedTitle;
         textLabel.font = [UIFont systemFontOfSize:10.0];
         textLabel.textAlignment = NSTextAlignmentCenter;
         textLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -226,8 +260,8 @@
     icon.tintColor = item.textColor;
     textLabel.textColor = item.textColor;
 
+    [self setTextForItem:item];
     [self setItemImage:nil forItem:item];
-    item.title = nil;
 
     if (index <= count) {
         NSString *indexString = [NSString stringWithFormat:@"container%d", count - index];
@@ -239,8 +273,8 @@
         [self createConstraints:icon container:container size:item.savedImage.size yOffset:-5];
         
         [container addSubview:textLabel];
-        CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count - 5.0;
-        [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 10) yOffset:16];
+        CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count;
+        [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 12) yOffset:18];
     }
 }
 
@@ -368,9 +402,8 @@
     [animationItem selectedState];
     
     if (selectedIndex != currentIndex) {
-        if (self.delegate &&
-            [self.delegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)] &&
-            ![self.delegate tabBarController:self shouldSelectViewController:next])
+        if ([_oldDelegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)] &&
+            ![_oldDelegate tabBarController:self shouldSelectViewController:next])
             return;
         
         if (isMore)
@@ -378,8 +411,8 @@
         else
             self.selectedIndex = gesture.view.tag;
         
-        if (self.delegate && [self.delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
-            [self.delegate tabBarController:self didSelectViewController:next];
+        if ([_oldDelegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
+            [_oldDelegate tabBarController:self didSelectViewController:next];
     }
     
     if (isMore && (selectedIndex == currentIndex)) {
@@ -400,13 +433,14 @@
 - (void)tabBarController:(UITabBarController *)tabBarController didSelectViewController:(UIViewController *)viewController
 {
     // Forward to old delegate.
-    if ([_oldDelegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)])
+    if ([_oldDelegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
         [_oldDelegate tabBarController:tabBarController didSelectViewController:viewController];
 }
 
 - (void)tabBarController:(UITabBarController *)tabBarController willBeginCustomizingViewControllers:(NSArray<__kindof UIViewController *> *)viewControllers
 {
     [self removeContainers];
+    [self restoreImages];
 
     // Forward to old delegate.
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:willBeginCustomizingViewControllers:)])
@@ -446,17 +480,14 @@
         return [UIApplication sharedApplication].statusBarOrientation;
 }
 
-- (nullable id <UIViewControllerInteractiveTransitioning>)tabBarController:(UITabBarController *)tabBarController
-                               interactionControllerForAnimationController: (id <UIViewControllerAnimatedTransitioning>)animationController
+- (nullable id <UIViewControllerInteractiveTransitioning>)tabBarController:(UITabBarController *)tabBarController interactionControllerForAnimationController: (id <UIViewControllerAnimatedTransitioning>)animationController
 {
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:interactionControllerForAnimationController:)])
         return [_oldDelegate tabBarController:tabBarController interactionControllerForAnimationController:animationController];
     return nil;
 }
 
-- (nullable id <UIViewControllerAnimatedTransitioning>)tabBarController:(UITabBarController *)tabBarController
-                     animationControllerForTransitionFromViewController:(UIViewController *)fromVC
-                                                       toViewController:(UIViewController *)toVC
+- (nullable id <UIViewControllerAnimatedTransitioning>)tabBarController:(UITabBarController *)tabBarController animationControllerForTransitionFromViewController:(UIViewController *)fromVC toViewController:(UIViewController *)toVC
 {
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:animationControllerForTransitionFromViewController:toViewController:)])
         return [_oldDelegate tabBarController:tabBarController animationControllerForTransitionFromViewController:fromVC toViewController:toVC];

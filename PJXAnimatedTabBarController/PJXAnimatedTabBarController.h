@@ -20,4 +20,6 @@
 // Next method is public, because it creates tab bar item for more navigation controller
 // at viewDidLoad, but the user probably needs to create it earlier.
 - (void)checkMoreNavigationControllerItem;
+
+- (void)refresh;
 @end
