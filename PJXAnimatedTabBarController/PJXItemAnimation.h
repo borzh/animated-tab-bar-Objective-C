@@ -19,8 +19,10 @@
 
 @interface PJXItemAnimation : NSObject <PJXItemAnimationProtocol>
 
-@property (nonatomic, assign)IBInspectable CGFloat duration;
-@property (nonatomic, strong)IBInspectable UIColor *textSelectedColor;
-@property (nonatomic, strong)IBInspectable UIColor *iconSelectedColor;
+@property (nonatomic, weak) IBInspectable id<CAAnimationDelegate> delegate;
+
+@property (nonatomic, assign) IBInspectable CGFloat duration;
+@property (nonatomic, strong) IBInspectable UIColor *textSelectedColor;
+@property (nonatomic, strong) IBInspectable UIColor *iconSelectedColor;
 
 @end

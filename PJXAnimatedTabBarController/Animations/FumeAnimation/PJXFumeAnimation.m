@@ -74,6 +74,8 @@
     
     CAKeyframeAnimation *opacityAnimation = [self createAnimation:@"opacity" values:@[@1.0 ,@0.0] duration:self.duration];
     [textLabel.layer addAnimation:opacityAnimation forKey:@"opacityLabelAnimation"];
+    
+    opacityAnimation.delegate = self.delegate;
 }
 
 - (CAKeyframeAnimation *)createAnimation:(NSString *)keyPath values:(id)values duration:(CGFloat)duration

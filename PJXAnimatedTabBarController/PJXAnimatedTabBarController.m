@@ -13,10 +13,19 @@
 #import "PJXIconView.h"
 
 
-@interface PJXAnimatedTabBarController () <UITabBarControllerDelegate> {
+@interface PJXAnimatedTabBarControllerDelegate: NSObject <UITabBarControllerDelegate, CAAnimationDelegate>
+@property (nonatomic, weak) PJXAnimatedTabBarController *controller;
+@property (nonatomic, weak) id<UITabBarControllerDelegate> oldDelegate;
+- (instancetype)initWithController:(PJXAnimatedTabBarController *)controller;
+@end
+
+
+@interface PJXAnimatedTabBarController () {
     NSDictionary *_containers;
-    id<UITabBarControllerDelegate> _oldDelegate;
-    BOOL _firstTime;
+    BOOL _loaded, _iconsForCustomizing;
+    UIImage *emptyImage;
+    NSString *emptyString;
+    PJXAnimatedTabBarControllerDelegate *_delegate;
 }
 @end
 
@@ -25,20 +34,28 @@
 
 #pragma mark - Life cycle.
 
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    
+    _delegate = [[PJXAnimatedTabBarControllerDelegate alloc] initWithController:self];
+    if (self.delegate)
+        _delegate.oldDelegate = self.delegate; // Save old delegate to forward all calls.
+}
+
 // We will create custom views in viewWillAppear instead of viewDidLoad, because in viewWillLoad
 // tabBar.items returns all viewController's items, but later it will be only fitting items.
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
     
-    if (!_firstTime) {
-        _firstTime = YES;
-
-        if (self.delegate)
-            _oldDelegate = self.delegate; // Save old delegate to forward all calls.
-        [super setDelegate:self];
+    if (!_loaded) {
+        [super setDelegate:_delegate];
         
+        [self recreateItems];
         [self refresh];
+
+        _loaded = YES;
     }
 }
 
@@ -59,39 +76,39 @@
 
 - (void)setDelegate:(id<UITabBarControllerDelegate>)delegate
 {
-    _oldDelegate = delegate;
+    _delegate.oldDelegate = delegate;
 }
 
-- (void)setSelectedIndex:(NSUInteger)selectedIndex
-{
-    NSArray *items = self.tabBar.items;
-    BOOL hasMore = (self.viewControllers.count > items.count);
-
-    NSInteger previousIndex = self.selectedIndex;
-    BOOL isPreviousMore = hasMore && (previousIndex >= items.count - 1);
-
-    PJXAnimatedTabBarItem *item = isPreviousMore ? self.moreNavigationController.tabBarItem : items[previousIndex];
-    [self setSelected:NO item:item];
-    
-    [super setSelectedIndex:selectedIndex];
-    
-    BOOL isMore = hasMore && (selectedIndex >= items.count - 1);
-    
-    item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
-    [self setSelected:YES item:item];
-}
-
-- (void)setSelectedViewController:(__kindof UIViewController *)selectedViewController
-{
-    PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)self.selectedViewController.tabBarItem;
-    [self setSelected:NO item:item];
-    
-    [super setSelectedViewController:selectedViewController];
-    
-    item = (PJXAnimatedTabBarItem *)selectedViewController.tabBarItem;
-    [self setSelected:YES item:item];
-}
-
+//- (void)setSelectedIndex:(NSUInteger)selectedIndex
+//{
+//    NSArray *items = self.tabBar.items;
+//    BOOL hasMore = (self.viewControllers.count > items.count);
+//
+//    NSInteger previousIndex = self.selectedIndex;
+//    BOOL isPreviousMore = hasMore && (previousIndex >= items.count - 1);
+//
+//    PJXAnimatedTabBarItem *item = isPreviousMore ? self.moreNavigationController.tabBarItem : items[previousIndex];
+//    [self setSelected:NO item:item];
+//    
+//    [super setSelectedIndex:selectedIndex];
+//    
+//    BOOL isMore = hasMore && (selectedIndex >= items.count - 1);
+//    
+//    item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
+//    [self setSelected:YES item:item];
+//}
+//
+//- (void)setSelectedViewController:(__kindof UIViewController *)selectedViewController
+//{
+//    PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)self.selectedViewController.tabBarItem;
+//    [self setSelected:NO item:item];
+//    
+//    [super setSelectedViewController:selectedViewController];
+//    
+//    item = (PJXAnimatedTabBarItem *)selectedViewController.tabBarItem;
+//    [self setSelected:YES item:item];
+//}
+//
 #pragma mark - private methods
 
 - (void)setSelected:(BOOL)isSelected item:(PJXAnimatedTabBarItem *)item
@@ -110,16 +127,130 @@
 - (void)checkMoreNavigationControllerItem
 {
     // Create PJXAnimatedTabBarItem for moreNavigationController.
-    UITabBarItem *moreItem = self.moreNavigationController.tabBarItem;
+    PJXAnimatedTabBarItem *moreItem = (PJXAnimatedTabBarItem *)self.moreNavigationController.tabBarItem;
     
     if (![moreItem isKindOfClass:[PJXAnimatedTabBarItem class]]) {
+        NSLog(@"Creating more icon");
         moreItem = [self createItemWithTitle:NSLocalizedString(self.moreTitle, nil)
                                        image:self.moreImage
                                    textColor:self.moreTextColor
                                    animation:self.moreAnimation
                                          tag:moreItem.tag];
+        [moreItem eraseImageAndTitle];
+        if (_containers) {
+            NSString *indexString = [NSString stringWithFormat:@"container%d", 0];
+        
+            UIView *container = _containers[indexString];
+            if (container.subviews.count == 2) {
+                UIImageView *imageView = container.subviews[0];
+                UILabel *textLabel = container.subviews[1];
+                moreItem.iconView = [[PJXIconView alloc] initWithIcon:imageView textLabel:textLabel];
+            }
+        }
         self.moreNavigationController.tabBarItem = moreItem;
     }
+}
+
+# pragma mark - Create tab bar items.
+
+- (void)recreateItems
+{
+    // When not using animation, we recreate the items as for more view controller customizing.
+    [self recreateItemsForCustomizing:!self.animated];
+}
+
+- (void)recreateItemsForCustomizing:(BOOL)isCustomizing
+{
+    if ((_iconsForCustomizing == isCustomizing) && _loaded)
+        return;
+    
+    _iconsForCustomizing = isCustomizing;
+    
+    NSLog(@"recreateItemsForCustomizing: %@", isCustomizing ? @"yes" : @"no");
+
+    UIViewController *selectedVC = self.selectedViewController;
+
+    // Generate a tinted unselected image based on image passed via the storyboard.
+    for (UIViewController *vc in self.viewControllers) {
+        PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)vc.tabBarItem;
+        item = [self createTabBarItemFrom:item isSelected:(vc == selectedVC) forMore:NO forCustomizing:isCustomizing];
+        if (item)
+            vc.tabBarItem = item;
+    }
+    
+    UIViewController *moreVC = self.moreNavigationController;
+    PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)moreVC.tabBarItem;
+    item = [self createTabBarItemFrom:item isSelected:(moreVC == selectedVC) forMore:YES forCustomizing:isCustomizing];
+    if (item)
+        moreVC.tabBarItem = item;
+}
+
+- (PJXAnimatedTabBarItem *)createTabBarItemFrom:(PJXAnimatedTabBarItem *)item isSelected:(BOOL)isSelected forMore:(BOOL)isMore forCustomizing:(BOOL)isCustomizing
+{
+//    if (self.animated && isCustomizing) {
+//        item.image = item.savedImage;
+//        item.selectedImage = item.savedSelectedImage;
+////        [item setItemImage:item.savedImage];
+//        return nil;
+//    }
+    NSInteger tag = item.tag;
+    UIImage *imageUnsel = item.image;
+    UIImage *imageSel = item.selectedImage;
+    UIColor *textColor = nil;
+    NSString *title = nil;
+    PJXItemAnimation *animation = nil;
+    PJXIconView *iconView = nil;
+
+    if ([item isKindOfClass:[PJXAnimatedTabBarItem class]]) {
+        imageUnsel = item.savedImage;
+        imageSel = item.savedSelectedImage;
+        title = item.savedTitle;
+        animation = item.animation;
+        textColor = item.textColor;
+        iconView = item.iconView;
+    }
+    
+    if ([_dataSource respondsToSelector:@selector(imageForViewControllerWithTabBarItemTag:forMore:)])
+        imageUnsel = [_dataSource imageForViewControllerWithTabBarItemTag:tag forMore:isCustomizing];
+    if ([_dataSource respondsToSelector:@selector(selectedImageForViewControllerWithTabBarItemTag:forMore:)])
+        imageSel = [_dataSource selectedImageForViewControllerWithTabBarItemTag:tag forMore:isCustomizing];
+    
+    if (!imageUnsel && isMore)
+        imageUnsel = self.moreImage;
+    
+    if (!imageSel && isMore)
+        imageSel = self.moreSelectedImage;
+    
+    if (title.length == 0 && isMore)
+        title = self.moreTitle;
+    if (!animation && isMore)
+        animation = self.moreAnimation;
+    
+    if (!textColor && isMore)
+        textColor = self.moreTextColor;
+
+    NSAssert(imageUnsel, @"Please provide item's image.");
+    NSAssert(textColor, @"Please provide item's text color.");
+    NSAssert(animation, @"Please provide item's animation.");
+    
+    PJXAnimatedTabBarItem *newItem = [[PJXAnimatedTabBarItem alloc] initWithTitle:title image:imageUnsel selectedImage:imageSel];
+    newItem.tag = tag;
+    newItem.textColor = textColor;
+    newItem.animation = animation;
+    newItem.iconView = iconView;
+
+    iconView.textLabel.textColor = isSelected ? animation.textSelectedColor : textColor;
+    iconView.icon.tintColor = isSelected ? animation.iconSelectedColor : textColor;
+
+    // Set unselected color attributes.
+    NSDictionary *attributes = @{ NSForegroundColorAttributeName:textColor };
+    [newItem setTitleTextAttributes:attributes forState:UIControlStateNormal];
+    
+    // Set selected color attributes.
+    attributes = @{ NSForegroundColorAttributeName:animation.textSelectedColor };
+    [newItem setTitleTextAttributes:attributes forState:UIControlStateSelected];
+
+    return newItem;
 }
 
 - (PJXAnimatedTabBarItem *)createItemWithTitle:(NSString *)title image:(UIImage *)image textColor:(UIColor *)textColor animation:(PJXItemAnimation *)animation tag:(NSInteger)tag
@@ -132,7 +263,7 @@
 
 - (void)setTextForItem:(PJXAnimatedTabBarItem *)item
 {
-    item.title = nil;
+    item.title = @" ";
 
     CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)(self.tabBar.items.count);
     textLabelWidth -= 6.0; // Some padding.
@@ -152,43 +283,6 @@
     item.iconView.textLabel.attributedText = [[NSAttributedString alloc] initWithString:item.savedTitle attributes:attrs];
 }
 
-- (void)setItemImage:(UIImage *)image forItem:(PJXAnimatedTabBarItem *)item
-{
-    // In customized more navigation controller this works for normal but not deselected image.
-    item.image = image;
-    item.selectedImage = image;
-
-    // Could not find another way around to show images in customized more navigation controller view.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [item setFinishedSelectedImage:image withFinishedUnselectedImage:image];
-#pragma clang diagnostic pop
-}
-
-- (void)restoreImageForItem:(PJXAnimatedTabBarItem *)item
-{
-    NSAssert([item isKindOfClass:[PJXAnimatedTabBarItem class]], @"item should be PJXAnimatedTabBarItem");
-              
-    if (item.image == nil) {
-        [self setItemImage:item.savedImage forItem:item];
-        item.title = item.savedTitle;
-        
-        // Set unselected color attributes.
-        UIColor *color = item.textColor;
-        if (color) {
-            NSDictionary *attributes = @{ NSForegroundColorAttributeName:color };
-            [item setTitleTextAttributes:attributes forState:UIControlStateNormal];
-        }
-        
-        // Set selected color attributes.
-        color = item.animation.textSelectedColor;
-        if (color) {
-            NSDictionary *attributes = @{ NSForegroundColorAttributeName:color };
-            [item setTitleTextAttributes:attributes forState:UIControlStateSelected];
-        }
-    }
-}
-
 - (void)removeContainers
 {
     // Remove item views we created for tab bar items.
@@ -197,23 +291,11 @@
     _containers = nil;
 }
 
-- (void)restoreImages
-{
-    // Restore images for tab bar items.
-    for (UIViewController *vc in self.viewControllers)
-        [self restoreImageForItem:(PJXAnimatedTabBarItem *)vc.tabBarItem];
-
-    // Restore image for moreNavigationController item.
-    [self checkMoreNavigationControllerItem];
-    PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)self.moreNavigationController.tabBarItem;
-    [self restoreImageForItem:item];
-}
-
 - (void)createCustomIcons
 {
-    // Oddly, after finishing customizing tab bar items, sometimes more navigation controller resets
-    // its tabBarItem to UITabBarItem *.
-    [self checkMoreNavigationControllerItem];
+//    // Oddly, after finishing customizing tab bar items, sometimes more navigation controller resets
+//    // its tabBarItem to UITabBarItem *.
+//    [self checkMoreNavigationControllerItem];
     
     NSArray<PJXAnimatedTabBarItem *> *items = (NSArray<PJXAnimatedTabBarItem *> *)self.tabBar.items;
     int itemsCount = (int)self.tabBar.items.count - 1;
@@ -260,8 +342,8 @@
     icon.tintColor = item.textColor;
     textLabel.textColor = item.textColor;
 
+    [item eraseImageAndTitle];
     [self setTextForItem:item];
-    [self setItemImage:nil forItem:item];
 
     if (index <= count) {
         NSString *indexString = [NSString stringWithFormat:@"container%d", count - index];
@@ -270,11 +352,11 @@
         container.tag = index;
 
         [container addSubview:icon];
-        [self createConstraints:icon container:container size:item.savedImage.size yOffset:-5];
+        [self createConstraints:icon container:container size:item.savedImage.size yOffset:-5.5];
         
         [container addSubview:textLabel];
         CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count;
-        [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 12) yOffset:18];
+        [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 12) yOffset:17.5];
     }
 }
 
@@ -381,16 +463,17 @@
     return viewContainer;
 }
 
-- (void)tapHandler:(UIGestureRecognizer *)gesture
+- (void)animateTo:(NSInteger)currentIndex doDelegate:(BOOL)doDelegate
 {
+    [self checkMoreNavigationControllerItem];
+    
     NSArray<PJXAnimatedTabBarItem *> *items = (NSArray<PJXAnimatedTabBarItem *> *)self.tabBar.items;
     
-    NSInteger currentIndex = gesture.view.tag;
     NSInteger selectedIndex = self.selectedIndex;
     if (selectedIndex >= items.count) // NSNotFound is index of MoreNavigationController.
         selectedIndex = items.count - 1; // Last bar item is always of MoreNavigationController.
-
-    BOOL isMore = (currentIndex >= items.count - 1) && (self.moreNavigationController.viewControllers.count > 0);
+    
+    BOOL isMore = (currentIndex >= items.count - 1) && (self.viewControllers.count > items.count);
     
     UIViewController *next = isMore ? self.moreNavigationController : self.viewControllers[currentIndex];
     
@@ -398,21 +481,26 @@
     [deselectItem deselectAnimation];
     
     PJXAnimatedTabBarItem *animationItem = (PJXAnimatedTabBarItem *)items[currentIndex];
+#if ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
+    if (isMore && self.moreNavigationController.viewControllers.count == 1)
+        animationItem.animation.delegate = _delegate;
+    else
+        animationItem.animation.delegate = nil;
+#endif
+    
     [animationItem playAnimation];
     [animationItem selectedState];
     
     if (selectedIndex != currentIndex) {
-        if ([_oldDelegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)] &&
-            ![_oldDelegate tabBarController:self shouldSelectViewController:next])
+        if (doDelegate && ![_delegate tabBarController:self shouldSelectViewController:next])
             return;
         
         if (isMore)
             self.selectedViewController = self.moreNavigationController;
         else
-            self.selectedIndex = gesture.view.tag;
+            self.selectedIndex = currentIndex;
         
-        if ([_oldDelegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
-            [_oldDelegate tabBarController:self didSelectViewController:next];
+        [_delegate tabBarController:self didSelectViewController:next];
     }
     
     if (isMore && (selectedIndex == currentIndex)) {
@@ -420,15 +508,26 @@
     }
 }
 
-#pragma mark - UITabBarControllerDelegate
-
-- (BOOL)tabBarController:(UITabBarController *)tabBarController shouldSelectViewController:(UIViewController *)viewController
+- (void)tapHandler:(UIGestureRecognizer *)gesture
 {
-    // Forward to old delegate.
-    if ([_oldDelegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)])
-        return [_oldDelegate tabBarController:tabBarController shouldSelectViewController:viewController];
-    return YES;
+    [self animateTo:gesture.view.tag doDelegate:YES];
 }
+
+@end
+
+
+#pragma mark - class PJXAnimatedTabBarControllerDelegate
+
+@implementation PJXAnimatedTabBarControllerDelegate
+
+- (instancetype)initWithController:(PJXAnimatedTabBarController *)controller
+{
+    if (self = [super init])
+        _controller = controller;
+    return self;
+}
+
+#pragma mark - UITabBarControllerDelegate unused methods
 
 - (void)tabBarController:(UITabBarController *)tabBarController didSelectViewController:(UIViewController *)viewController
 {
@@ -439,12 +538,15 @@
 
 - (void)tabBarController:(UITabBarController *)tabBarController willBeginCustomizingViewControllers:(NSArray<__kindof UIViewController *> *)viewControllers
 {
-    [self removeContainers];
-    [self restoreImages];
-
     // Forward to old delegate.
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:willBeginCustomizingViewControllers:)])
         [_oldDelegate tabBarController:tabBarController willBeginCustomizingViewControllers:viewControllers];
+#if !ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
+    if (self.animated) {
+        [_controller removeContainers];
+        [_controller recreateItemsForCustomizing:YES];
+    }
+#endif
 }
 
 - (void)tabBarController:(UITabBarController *)tabBarController willEndCustomizingViewControllers:(NSArray<__kindof UIViewController *> *)viewControllers changed:(BOOL)changed
@@ -456,11 +558,16 @@
 
 - (void)tabBarController:(UITabBarController *)tabBarController didEndCustomizingViewControllers:(NSArray<__kindof UIViewController *> *)viewControllers changed:(BOOL)changed
 {
-    [self refresh];
-
     // Forward to old delegate.
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:didEndCustomizingViewControllers:changed:)])
         [_oldDelegate tabBarController:tabBarController didEndCustomizingViewControllers:viewControllers changed:changed];
+#if !ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
+    if (self.animated) {
+        [_controller removeContainers];
+        [_controller recreateItemsForCustomizing:NO];
+        [_controller refresh];
+    }
+#endif
 }
 
 - (UIInterfaceOrientationMask)tabBarControllerSupportedInterfaceOrientations:(UITabBarController *)tabBarController
@@ -494,5 +601,49 @@
     return nil;
 }
 
+#pragma mark - UITabBarControllerDelegate used methods
+
+- (BOOL)tabBarController:(UITabBarController *)tabBarController shouldSelectViewController:(UIViewController *)viewController
+{
+    BOOL should = YES;
+    // Forward to old delegate.
+    if ([_oldDelegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)])
+        should = [_oldDelegate tabBarController:tabBarController shouldSelectViewController:viewController];
+    if (should && _controller.animated) {
+#if ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
+        if (_controller.selectedViewController == _controller.moreNavigationController) {
+            // Coming from more navigation controller.
+            [_controller recreateItemsForCustomizing:NO];
+            [_controller refresh];
+        }
+#endif
+        
+        // Animate switch.
+        NSInteger index = [_controller.viewControllers indexOfObject:viewController];
+        NSInteger max = _controller.tabBar.items.count - 1;
+        if (index > max)
+            index = max;
+        [_controller animateTo:index doDelegate:NO]; // Avoid loop.
+    }
+    return should;
+}
+
+#pragma mark - CAAnimationDelegate
+
+- (void)animationDidStart:(CAAnimation *)anim
+{
+}
+
+- (void)animationDidStop:(CAAnimation *)anim finished:(BOOL)flag
+{
+    NSLog(@"Finished More item animation: %@", flag ? @"yes" : @"no");
+    
+    // This method is called after animation to More view controller.
+    // Recreate icons for More View Controller customizing.
+    if (flag && (_controller.selectedViewController == _controller.moreNavigationController)) {
+        [_controller removeContainers];
+        [_controller recreateItemsForCustomizing:YES];
+    }
+}
 
 @end

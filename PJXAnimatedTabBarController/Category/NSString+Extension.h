@@ -6,7 +6,7 @@
 //  Copyright (c) 2015 Boris Godin. All rights reserved.
 //
 
-#import <Foundation/Foundation.h>
+@import UIKit;
 
 @interface NSString (Extension)
 - (CGFloat)kernForFont:(UIFont *)font toFitWidth:(CGFloat)width;

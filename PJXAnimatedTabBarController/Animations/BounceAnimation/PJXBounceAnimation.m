@@ -46,13 +46,14 @@
     bounceAnimation.values = @[@1.0, @1.4, @0.9, @1.15, @0.95, @1.02, @1.0];
     bounceAnimation.duration = (NSTimeInterval)self.duration;
     bounceAnimation.calculationMode = kCAAnimationCubic;
+    bounceAnimation.delegate = self.delegate;
     
     [icon.layer addAnimation:bounceAnimation forKey:@"bounceAnimation"];
     
     UIImage *iconImage = icon.image;
     if (iconImage) {
-        UIImage *renderImage = [iconImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        icon.image = renderImage;
+//        UIImage *renderImage = [iconImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+//        icon.image = renderImage;
         icon.tintColor = self.iconSelectedColor;
     }
 }

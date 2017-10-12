@@ -30,7 +30,7 @@
 - (void)setImage:(UIImage *)image
 {
     [super setImage:image];
-    if (image) {
+    if (!IsTabBarItemEmptyImage(image)) {
         // Put image to iconView and save it for future reference.
         if (self.iconView)
             self.iconView.icon.image = image;
@@ -38,15 +38,43 @@
     }
 }
 
+- (void)setSelectedImage:(UIImage *)selectedImage
+{
+    [super setSelectedImage:selectedImage];
+    if (!IsTabBarItemEmptyImage(selectedImage)) {
+        // Save it for future reference.
+        _savedSelectedImage = selectedImage;
+    }
+}
+
 - (void)setTitle:(NSString *)title
 {
     [super setTitle:title];
-    if (title.length) {
+    if (!IsTabBarItemEmptyString(title)) {
         // Put title to iconView and save it for future reference.
         if (self.iconView)
             self.iconView.textLabel.text = title;
         _savedTitle = title;
     }
+}
+
+- (void)setItemImage:(UIImage *)image
+{
+    // In customized more navigation controller this works for normal but not deselected image.
+    self.image = image;
+    self.selectedImage = image;
+
+    // Could not find another way around to show images in customized more navigation controller view.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+//    [self setFinishedSelectedImage:image withFinishedUnselectedImage:image];
+#pragma clang diagnostic pop
+}
+
+- (void)eraseImageAndTitle
+{
+    [self setItemImage:TabBarItemEmptyImage];
+    self.title = TabBarItemEmptyString;
 }
 
 - (NSString *)badgeValue

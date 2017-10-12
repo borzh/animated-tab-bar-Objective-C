@@ -52,6 +52,7 @@
     
     rotateAnimation.toValue = @(toValue);
     rotateAnimation.duration = (NSTimeInterval)self.duration;
+    rotateAnimation.delegate = self.delegate;
     
     [icon.layer addAnimation:rotateAnimation forKey:@"rotation360"];
     

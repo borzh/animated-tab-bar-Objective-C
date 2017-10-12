@@ -70,6 +70,8 @@
     frameAnimation.repeatCount = 1;
     frameAnimation.removedOnCompletion = NO;
     frameAnimation.fillMode = kCAFillModeForwards;
+    frameAnimation.delegate = self.delegate;
+    
     [icon.layer addAnimation:frameAnimation forKey:@"frameAnimation"];
 }
 

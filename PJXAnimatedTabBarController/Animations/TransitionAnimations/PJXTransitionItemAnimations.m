@@ -25,10 +25,15 @@
 {
     [self selectedColor:icon textLabel:textLabel];
     
+    __weak typeof(self) weakSelf = self;
     [UIView transitionWithView:icon duration:(NSTimeInterval)self.duration options:self.transitionOptions animations:^{
     
     } completion:^(BOOL finished) {
-        
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnonnull"
+        if ([weakSelf.delegate respondsToSelector:@selector(animationDidStop:finished:)])
+            [weakSelf.delegate animationDidStop:nil finished:finished];
+#pragma clang diagnostic pop
     }];
 }
 
