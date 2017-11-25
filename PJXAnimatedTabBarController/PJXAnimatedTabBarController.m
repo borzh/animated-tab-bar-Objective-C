@@ -542,7 +542,7 @@
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:willBeginCustomizingViewControllers:)])
         [_oldDelegate tabBarController:tabBarController willBeginCustomizingViewControllers:viewControllers];
 #if !ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
-    if (self.animated) {
+    if (_controller.animated) {
         [_controller removeContainers];
         [_controller recreateItemsForCustomizing:YES];
     }
@@ -562,7 +562,7 @@
     if ([_oldDelegate respondsToSelector:@selector(tabBarController:didEndCustomizingViewControllers:changed:)])
         [_oldDelegate tabBarController:tabBarController didEndCustomizingViewControllers:viewControllers changed:changed];
 #if !ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
-    if (self.animated) {
+    if (_controller.animated) {
         [_controller removeContainers];
         [_controller recreateItemsForCustomizing:NO];
         [_controller refresh];
