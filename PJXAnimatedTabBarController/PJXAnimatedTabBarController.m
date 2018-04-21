@@ -37,6 +37,9 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+
+//    self.tabBar.itemPositioning = UITabBarItemPositioningFill;
+    self.tabBar.itemPositioning = UITabBarItemPositioningCentered;
     
     _delegate = [[PJXAnimatedTabBarControllerDelegate alloc] initWithController:self];
     if (self.delegate)
@@ -57,6 +60,13 @@
 
         _loaded = YES;
     }
+}
+
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    self.tabBar.itemWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count;
+    self.tabBar.itemSpacing = 0.0;
 }
 
 #pragma mark - Public methods.
