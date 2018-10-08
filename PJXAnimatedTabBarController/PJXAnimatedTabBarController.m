@@ -89,25 +89,25 @@
     _delegate.oldDelegate = delegate;
 }
 
-//- (void)setSelectedIndex:(NSUInteger)selectedIndex
-//{
-//    NSArray *items = self.tabBar.items;
-//    BOOL hasMore = (self.viewControllers.count > items.count);
-//
-//    NSInteger previousIndex = self.selectedIndex;
-//    BOOL isPreviousMore = hasMore && (previousIndex >= items.count - 1);
-//
-//    PJXAnimatedTabBarItem *item = isPreviousMore ? self.moreNavigationController.tabBarItem : items[previousIndex];
-//    [self setSelected:NO item:item];
-//    
-//    [super setSelectedIndex:selectedIndex];
-//    
-//    BOOL isMore = hasMore && (selectedIndex >= items.count - 1);
-//    
-//    item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
-//    [self setSelected:YES item:item];
-//}
-//
+- (void)setSelectedIndex:(NSUInteger)selectedIndex
+{    
+    NSArray *items = self.tabBar.items;
+    BOOL hasMore = (self.viewControllers.count > items.count);
+
+    NSInteger previousIndex = self.selectedIndex;
+    BOOL isPreviousMore = hasMore && (previousIndex >= items.count - 1);
+
+    PJXAnimatedTabBarItem *item = isPreviousMore ? self.moreNavigationController.tabBarItem : items[previousIndex];
+    [self setSelected:NO item:item];
+    
+    [super setSelectedIndex:selectedIndex];
+    
+    BOOL isMore = hasMore && (selectedIndex >= items.count - 1);
+    
+    item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
+    [self setSelected:YES item:item];
+}
+
 //- (void)setSelectedViewController:(__kindof UIViewController *)selectedViewController
 //{
 //    PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)self.selectedViewController.tabBarItem;
@@ -176,7 +176,7 @@
     
     _iconsForCustomizing = isCustomizing;
     
-    NSLog(@"recreateItemsForCustomizing: %@", isCustomizing ? @"yes" : @"no");
+//    NSLog(@"recreateItemsForCustomizing: %@", isCustomizing ? @"yes" : @"no");
 
     UIViewController *selectedVC = self.selectedViewController;
 
@@ -621,7 +621,9 @@
         should = [_oldDelegate tabBarController:tabBarController shouldSelectViewController:viewController];
     if (should && _controller.animated) {
 #if ANIMATED_TAB_BAR_SHOULD_RECREATE_ITEMS_ON_SELECT_MORE
-        if (_controller.selectedViewController == _controller.moreNavigationController) {
+        NSInteger selected = _controller.selectedIndex;
+        NSInteger lastOne = _controller.tabBar.items.count-1;
+        if (selected >= lastOne) {
             // Coming from more navigation controller.
             [_controller recreateItemsForCustomizing:NO];
             [_controller refresh];
@@ -646,7 +648,7 @@
 
 - (void)animationDidStop:(CAAnimation *)anim finished:(BOOL)flag
 {
-    NSLog(@"Finished More item animation: %@", flag ? @"yes" : @"no");
+//    NSLog(@"Finished More item animation: %@", flag ? @"yes" : @"no");
     
     // This method is called after animation to More view controller.
     // Recreate icons for More View Controller customizing.
