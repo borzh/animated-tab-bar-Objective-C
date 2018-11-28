@@ -208,6 +208,8 @@
     UIImage *imageSel = item.selectedImage;
     UIColor *textColor = nil;
     NSString *title = nil;
+    NSString *badgeValue = item.badgeValue;
+    UIColor *badgeColor = item.badgeColor;
     PJXItemAnimation *animation = nil;
     PJXIconView *iconView = nil;
 
@@ -248,6 +250,11 @@
     newItem.textColor = textColor;
     newItem.animation = animation;
     newItem.iconView = iconView;
+    
+    if (badgeColor)
+        newItem.badgeColor = badgeColor;
+    if (badgeValue)
+        newItem.badgeValue = badgeValue;
 
     iconView.textLabel.textColor = isSelected ? animation.textSelectedColor : textColor;
     iconView.icon.tintColor = isSelected ? animation.iconSelectedColor : textColor;
