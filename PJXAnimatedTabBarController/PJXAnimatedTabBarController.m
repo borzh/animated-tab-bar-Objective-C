@@ -14,6 +14,7 @@
 
 
 @interface PJXAnimatedTabBarControllerDelegate: NSObject <UITabBarControllerDelegate, CAAnimationDelegate>
+@property (nonatomic, assign) BOOL firstTime;
 @property (nonatomic, weak) PJXAnimatedTabBarController *controller;
 @property (nonatomic, weak) id<UITabBarControllerDelegate> oldDelegate;
 - (instancetype)initWithController:(PJXAnimatedTabBarController *)controller;
@@ -46,12 +47,15 @@
         _delegate.oldDelegate = self.delegate; // Save old delegate to forward all calls.
 }
 
-// We will create custom views in viewWillAppear instead of viewDidLoad, because in viewWillLoad
-// tabBar.items returns all viewController's items, but later it will be only fitting items.
-- (void)viewWillAppear:(BOOL)animated
+- (void)viewDidLayoutSubviews
 {
-    [super viewWillAppear:animated];
+    [super viewDidLayoutSubviews];
     
+    self.tabBar.itemWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count;
+    self.tabBar.itemSpacing = 0.0;
+
+    // We will create custom views in here instead of viewDidLoad, because in viewWillLoad
+    // tabBar.items returns all viewController's items, but here it will be only fitting items.
     if (!_loaded) {
         [super setDelegate:_delegate];
         
@@ -60,13 +64,6 @@
 
         _loaded = YES;
     }
-}
-
-- (void)viewDidLayoutSubviews
-{
-    [super viewDidLayoutSubviews];
-    self.tabBar.itemWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count;
-    self.tabBar.itemSpacing = 0.0;
 }
 
 #pragma mark - Public methods.
@@ -369,15 +366,15 @@
         container.tag = index;
 
         [container addSubview:icon];
-        [self createConstraints:icon container:container size:item.savedImage.size yOffset:-5.5];
+        [self createConstraints:icon container:container size:item.savedImage.size yOffset:4 isTop:YES];
         
         [container addSubview:textLabel];
         CGFloat textLabelWidth = self.tabBar.frame.size.width / (CGFloat)self.tabBar.items.count;
-        [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 12) yOffset:17.5];
+        [self createConstraints:textLabel container:container size:CGSizeMake(textLabelWidth, 12) yOffset:35.3 isTop:YES];
     }
 }
 
-- (void)createConstraints:(UIView *)view container:(UIView *)container size:(CGSize)size yOffset:(CGFloat)yOffset
+- (void)createConstraints:(UIView *)view container:(UIView *)container size:(CGSize)size yOffset:(CGFloat)yOffset isTop:(BOOL)isTop
 {
     NSLayoutConstraint *constX = [NSLayoutConstraint constraintWithItem:view
                                                               attribute:NSLayoutAttributeCenterX
@@ -389,10 +386,10 @@
     [container addConstraint:constX];
     
     NSLayoutConstraint *constY = [NSLayoutConstraint constraintWithItem:view
-                                                              attribute:NSLayoutAttributeCenterY
+                                                              attribute:isTop ? NSLayoutAttributeTop : NSLayoutAttributeBottom
                                                               relatedBy:NSLayoutRelationEqual
                                                                  toItem:container
-                                                              attribute:NSLayoutAttributeCenterY
+                                                              attribute:isTop ? NSLayoutAttributeTop : NSLayoutAttributeBottom
                                                              multiplier:1
                                                                constant:yOffset];
     [container addConstraint:constY];
