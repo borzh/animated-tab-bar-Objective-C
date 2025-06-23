@@ -24,8 +24,6 @@
 @interface PJXAnimatedTabBarController () {
     NSDictionary *_containers;
     BOOL _loaded, _iconsForCustomizing;
-    UIImage *emptyImage;
-    NSString *emptyString;
     PJXAnimatedTabBarControllerDelegate *_delegate;
 }
 @end
@@ -38,6 +36,10 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+
+    if (@available(iOS 18.0, *) && UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        self.traitOverrides.horizontalSizeClass = UIUserInterfaceSizeClassCompact;
+    }
 
 //    self.tabBar.itemPositioning = UITabBarItemPositioningFill;
     self.tabBar.itemPositioning = UITabBarItemPositioningCentered;
@@ -92,30 +94,31 @@
     BOOL hasMore = (self.viewControllers.count > items.count);
 
     NSInteger previousIndex = self.selectedIndex;
-    BOOL isPreviousMore = hasMore && (previousIndex >= items.count - 1);
+    BOOL isPreviousMore = (hasMore && (previousIndex >= items.count - 1)) || previousIndex == NSNotFound;
 
-    PJXAnimatedTabBarItem *item = isPreviousMore ? self.moreNavigationController.tabBarItem : items[previousIndex];
-    [self setSelected:NO item:item];
+    if (previousIndex == NSNotFound) {
+        PJXAnimatedTabBarItem *item = isPreviousMore ? self.moreNavigationController.tabBarItem : items[previousIndex];
+        [self setSelected:NO item:item];
+    }
     
     [super setSelectedIndex:selectedIndex];
     
-    BOOL isMore = hasMore && (selectedIndex >= items.count - 1);
+    BOOL isMore = (hasMore && (selectedIndex >= items.count - 1)) || selectedIndex == NSNotFound;
     
-    item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
-    [self setSelected:YES item:item];
+    if (selectedIndex >= 0) {
+        PJXAnimatedTabBarItem *item = isMore ? self.moreNavigationController.tabBarItem : items[selectedIndex];
+        [self setSelected:YES item:item];
+    }
 }
 
-//- (void)setSelectedViewController:(__kindof UIViewController *)selectedViewController
-//{
-//    PJXAnimatedTabBarItem *item = (PJXAnimatedTabBarItem *)self.selectedViewController.tabBarItem;
-//    [self setSelected:NO item:item];
-//    
-//    [super setSelectedViewController:selectedViewController];
-//    
-//    item = (PJXAnimatedTabBarItem *)selectedViewController.tabBarItem;
-//    [self setSelected:YES item:item];
-//}
-//
+- (void)setSelectedViewController:(__kindof UIViewController *)selectedViewController
+{
+    NSInteger index = [self.viewControllers indexOfObject:selectedViewController];
+    if (index != NSNotFound)
+        [self setSelectedIndex:index];
+    [super setSelectedViewController:selectedViewController];
+}
+
 #pragma mark - private methods
 
 - (void)setSelected:(BOOL)isSelected item:(PJXAnimatedTabBarItem *)item
@@ -446,7 +449,7 @@
 - (UIView *)createViewContainer
 {
     UIView *viewContainer = [[UIView alloc] init];
-    viewContainer.backgroundColor = [UIColor clearColor]; // for test
+//    viewContainer.backgroundColor = [UIColor clearColor]; // for test
     viewContainer.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:viewContainer];
     
@@ -656,10 +659,10 @@
     
     // This method is called after animation to More view controller.
     // Recreate icons for More View Controller customizing.
-    if (flag && (_controller.selectedViewController == _controller.moreNavigationController)) {
-        [_controller removeContainers];
-        [_controller recreateItemsForCustomizing:YES];
-    }
+//    if (flag && (_controller.selectedViewController == _controller.moreNavigationController)) {
+//        [_controller removeContainers];
+//        [_controller recreateItemsForCustomizing:YES];
+//    }
 }
 
 @end
