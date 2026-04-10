@@ -58,9 +58,21 @@
 
 - (UITraitCollection *)traitCollection {
     // This is for iPad to have compact tab bar.
-    UITraitCollection *trait1 = [super traitCollection];
-    UITraitCollection *trait2 = [UITraitCollection traitCollectionWithHorizontalSizeClass: UIUserInterfaceSizeClassCompact];
-    return [UITraitCollection traitCollectionWithTraitsFromCollections:@[trait1, trait2]];
+    if (@available(iOS 17.0, *)) {
+        return [super traitCollection];
+    }
+    else {
+        UITraitCollection *trait1 = [super traitCollection];
+        UITraitCollection *trait2 = [UITraitCollection traitCollectionWithHorizontalSizeClass: UIUserInterfaceSizeClassCompact];
+        return [UITraitCollection traitCollectionWithTraitsFromCollections:@[trait1, trait2]];
+    }
+}
+
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    if (@available(iOS 17.0, *)) {
+        self.traitOverrides.horizontalSizeClass = UIUserInterfaceSizeClassCompact;
+    }
 }
 
 @end

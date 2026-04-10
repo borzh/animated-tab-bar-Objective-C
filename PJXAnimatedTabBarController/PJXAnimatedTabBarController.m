@@ -36,8 +36,11 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+    
+    if (!_animated)
+        return;
 
-    if (@available(iOS 18.0, *) && UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+    if (@available(iOS 18.0, *)) {
         self.traitOverrides.horizontalSizeClass = UIUserInterfaceSizeClassCompact;
     }
 
@@ -165,6 +168,9 @@
 
 - (void)recreateItems
 {
+    if (!self.animated)
+        return;
+
     // When not using animation, we recreate the items as for more view controller customizing.
     [self recreateItemsForCustomizing:!self.animated];
 }
@@ -509,7 +515,7 @@
     [animationItem selectedState];
     
     if (selectedIndex != currentIndex) {
-        if (doDelegate && ![_delegate tabBarController:self shouldSelectViewController:next])
+        if (doDelegate && _delegate && ![_delegate tabBarController:self shouldSelectViewController:next])
             return;
         
         if (isMore)
